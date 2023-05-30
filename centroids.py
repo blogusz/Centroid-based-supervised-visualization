@@ -1,5 +1,6 @@
 from metrics import LocalMetric
 import numpy as np
+import umap
 from typing_extensions import Literal
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
@@ -14,8 +15,6 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # algorithm is a clustering algorithm we want to use
 # method - global, local, hybrid
 def compute_centroids(algorithm: Literal["kmeans", "agglomerative", "dbscan"], method: Literal["global", "local"], x_data: np.ndarray, y_data: np.ndarray, n_centroids_local: int = 10, n_centroids_global: int = 10, epsilon: float = 1.0, min_samples: int = 1):
-    centroids = []
-
     if algorithm == "kmeans" and method == "global":
         centroids, cluster_labels = global_kmeans(x_data, n_centroids_global)
     elif algorithm == "kmeans" and method == "local":
@@ -120,7 +119,7 @@ def measure_distances(x_data: np.ndarray, centroids: np.ndarray):
     return distances
 
 
-def visualize_tsne_with_clusters(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray):
+def visualize_tsne(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
     combined_data = np.concatenate((x_data, centroids), axis=0)
 
     tsne = TSNE(n_components=2, random_state=42)
@@ -129,15 +128,46 @@ def visualize_tsne_with_clusters(x_data: np.ndarray, cluster_labels: np.ndarray,
     embedded_x_data = embedded_data[:len(x_data)]
     embedded_centroids = embedded_data[len(x_data):]
 
-    plt.figure(figsize=(12, 8))
-    scatter = plt.scatter(
+    scatter = ax.scatter(
         embedded_x_data[:, 0], embedded_x_data[:, 1], c=cluster_labels, cmap='tab10')
-    plt.scatter(embedded_centroids[:, 0],
-                embedded_centroids[:, 1], c='red', marker='x')
+    ax.scatter(embedded_centroids[:, 0],
+               embedded_centroids[:, 1], c='red', marker='x')
 
     legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
     legend_labels.append("Centroids")
-    plt.legend(handles=scatter.legend_elements()[0], labels=legend_labels)
+    ax.legend(handles=scatter.legend_elements()[
+              0], labels=legend_labels, loc='upper right')
 
-    plt.title("t-SNE with Clusters and Centroids")
-    plt.show()
+    if method == "global":
+        ax.set_title(
+            f"{algorithms_name} with {len(centroids)} global centroids")
+    else:
+        ax.set_title(
+            f"{algorithms_name} with {int(len(centroids)/10)} local centroids per cluster")
+
+
+def visualize_umap(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
+    combined_data = np.concatenate((x_data, centroids), axis=0)
+
+    reducer = umap.UMAP(random_state=42)
+    embedded_data = reducer.fit_transform(combined_data)
+
+    embedded_x_data = embedded_data[:len(x_data)]
+    embedded_centroids = embedded_data[len(x_data):]
+
+    scatter = ax.scatter(
+        embedded_x_data[:, 0], embedded_x_data[:, 1], c=cluster_labels, cmap='tab10')
+    ax.scatter(embedded_centroids[:, 0],
+               embedded_centroids[:, 1], c='red', marker='x')
+
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    legend_labels.append("Centroids")
+    ax.legend(handles=scatter.legend_elements()[
+              0], labels=legend_labels, loc='upper right')
+
+    if method == "global":
+        ax.set_title(
+            f"{algorithms_name} with {len(centroids)} global centroids")
+    else:
+        ax.set_title(
+            f"{algorithms_name} with {int(len(centroids)/10)} local centroids per cluster")
