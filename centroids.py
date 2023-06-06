@@ -38,6 +38,7 @@ def compute_centroids(algorithm: Literal["kmeans", "agglomerative", "dbscan"], m
         print("Not defined yet")
     return np.array(centroids), np.array(cluster_labels)
 
+
 # zapisywanie i ladowanie wynikow w jakis sposob psuje kmeans lokalny
 # # n_centroids is a number of centroids we want to find in whole dataset
 # def global_kmeans(x_data, n_centroids):
