@@ -203,6 +203,8 @@ def compute_centroids(algorithm: Literal["kmeans", "agglomerative", "dbscan"], m
 #         np.save(labels_file, cluster_labels)
 
 #     return centroids, cluster_labels
+
+
 def global_kmeans(x_data, n_centroids):
     kmeans = KMeans(n_clusters=n_centroids)
     kmeans.fit(x_data)
@@ -285,31 +287,61 @@ def measure_distances(x_data: np.ndarray, centroids: np.ndarray):
     return distances
 
 
-def visualize_tsne(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
-    combined_data = np.concatenate((x_data, centroids), axis=0)
+# def visualize_tsne(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
+#     combined_data = np.concatenate((x_data, centroids), axis=0)
 
+#     tsne = TSNE(n_components=2, random_state=42)
+#     embedded_data = tsne.fit_transform(combined_data)
+
+#     embedded_x_data = embedded_data[:len(x_data)]
+#     embedded_centroids = embedded_data[len(x_data):]
+
+#     scatter = ax.scatter(
+#         embedded_x_data[:, 0], embedded_x_data[:, 1], c=cluster_labels, cmap='tab10')
+#     ax.scatter(embedded_centroids[:, 0],
+#                embedded_centroids[:, 1], c='red', marker='x')
+
+#     legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+#     legend_labels.append("Centroids")
+#     ax.legend(handles=scatter.legend_elements()[
+#               0], labels=legend_labels, loc='upper right')
+
+#     if method == "global":
+#         ax.set_title(
+#             f"{algorithms_name} with {len(centroids)} global centroids")
+#     else:
+#         ax.set_title(
+#             f"{algorithms_name} with {int(len(centroids)/10)} local centroids per cluster")
+
+
+def tsne_algorithms(x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, method: str, n_centroids: int, ax: int):
     tsne = TSNE(n_components=2, random_state=42)
-    embedded_data = tsne.fit_transform(combined_data)
-
-    embedded_x_data = embedded_data[:len(x_data)]
-    embedded_centroids = embedded_data[len(x_data):]
+    embedded_data = tsne.fit_transform(x_data)
 
     scatter = ax.scatter(
-        embedded_x_data[:, 0], embedded_x_data[:, 1], c=cluster_labels, cmap='tab10')
-    ax.scatter(embedded_centroids[:, 0],
-               embedded_centroids[:, 1], c='red', marker='x')
-
+        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10')
+    
     legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
-    legend_labels.append("Centroids")
-    ax.legend(handles=scatter.legend_elements()[
-              0], labels=legend_labels, loc='upper right')
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
 
     if method == "global":
         ax.set_title(
-            f"{algorithms_name} with {len(centroids)} global centroids")
+            f"{algorithms_name} with {n_centroids} global centroids")
     else:
         ax.set_title(
-            f"{algorithms_name} with {int(len(centroids)/10)} local centroids per cluster")
+            f"{algorithms_name} with {int(n_centroids)/10} local centroids per cluster")
+
+
+def tsne_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
+    tsne = TSNE(n_components=2, random_state=42)
+    embedded_data = tsne.fit_transform(x_data)
+
+    scatter = ax.scatter(embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10')
+    
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
+
+    ax.set_title(f"no centroids")
 
 
 # def visualize_umap(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
@@ -321,51 +353,53 @@ def visualize_tsne(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np
 #     embedded_x_data = embedded_data[:len(x_data)]
 #     embedded_centroids = embedded_data[len(x_data):]
 
+#     unique_labels = np.unique(cluster_labels)
 #     scatter = ax.scatter(
-#         embedded_x_data[:, 0], embedded_x_data[:, 1], c=cluster_labels, cmap='tab10')
+#         embedded_x_data[:, 0], embedded_x_data[:, 1], c=cluster_labels, cmap='magma', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
+
 #     ax.scatter(embedded_centroids[:, 0],
 #                embedded_centroids[:, 1], c='red', marker='x')
 
-    # legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
-    # legend_labels.append("Centroids")
-    # ax.legend(handles=scatter.legend_elements()[
-    #           0], labels=legend_labels, loc='upper right')
+#     # legend_labels = [f"Cluster {label}" for label in unique_labels]
+#     # legend_labels.append("Centroids")
+#     # ax.legend(handles=scatter.legend_elements(num=len(unique_labels))
+#     #           [0], labels=legend_labels, loc='upper right')
+#     legend_labels = [f"Cluster {label}" for label in unique_labels]
+#     legend_labels.append("Centroids")
+#     ax.legend(handles=scatter.legend_elements()[
+#               0], labels=legend_labels, loc='upper right')
 
 #     if method == "global":
 #         ax.set_title(
 #             f"{algorithms_name} with {len(centroids)} global centroids")
 #     else:
 #         ax.set_title(
-#             f"{algorithms_name} with {int(len(centroids)/10)} local centroids per cluster")
+#             f"{algorithms_name} with {len(centroids)} local centroids per cluster")
 
-def visualize_umap(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
-    combined_data = np.concatenate((x_data, centroids), axis=0)
-
+def umap_algorithms(x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, method: str, n_centroids: int, ax: int):
     reducer = umap.UMAP(random_state=42)
-    embedded_data = reducer.fit_transform(combined_data)
+    embedded_data = reducer.fit_transform(x_data)
 
-    embedded_x_data = embedded_data[:len(x_data)]
-    embedded_centroids = embedded_data[len(x_data):]
-
-    unique_labels = np.unique(cluster_labels)
     scatter = ax.scatter(
-        embedded_x_data[:, 0], embedded_x_data[:, 1], c=cluster_labels, cmap='magma', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
+        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
 
-    ax.scatter(embedded_centroids[:, 0],
-               embedded_centroids[:, 1], c='red', marker='x')
-
-    # legend_labels = [f"Cluster {label}" for label in unique_labels]
-    # legend_labels.append("Centroids")
-    # ax.legend(handles=scatter.legend_elements(num=len(unique_labels))
-    #           [0], labels=legend_labels, loc='upper right')
-    legend_labels = [f"Cluster {label}" for label in unique_labels]
-    legend_labels.append("Centroids")
-    ax.legend(handles=scatter.legend_elements()[
-              0], labels=legend_labels, loc='upper right')
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
 
     if method == "global":
-        ax.set_title(
-            f"{algorithms_name} with {len(centroids)} global centroids")
+        ax.set_title(f"{algorithms_name} with {n_centroids} global centroids")
     else:
-        ax.set_title(
-            f"{algorithms_name} with {len(centroids)} local centroids per cluster")
+        ax.set_title(f"{algorithms_name} with {int(n_centroids)} local centroids per cluster")
+        
+
+def umap_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
+    reducer = umap.UMAP(random_state=42)
+    embedded_data = reducer.fit_transform(x_data)
+
+    scatter = ax.scatter(
+        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
+
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
+
+    ax.set_title(f"no centroids")
