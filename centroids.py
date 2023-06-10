@@ -39,8 +39,155 @@ def compute_centroids(algorithm: Literal["kmeans", "agglomerative", "dbscan"], m
     return np.array(centroids), np.array(cluster_labels)
 
 
+# n_centroids is a number of centroids we want to find in whole dataset
+def global_kmeans(x_data, n_centroids):
+    kmeans = KMeans(n_clusters=n_centroids)
+    kmeans.fit(x_data)
+    centroids = kmeans.cluster_centers_
+    cluster_labels = kmeans.labels_
+
+    return centroids, cluster_labels
+
+
+# n_centroids here is a number of centroids we want to find in each class
+def local_kmeans(x_data, y_data, n_centroids):
+    centroids = []
+    cluster_labels = []
+
+    for label in set(y_data):
+        centroid, labels = global_kmeans(x_data[y_data == label], n_centroids)
+        centroids.append(centroid)
+        cluster_labels.append(labels + len(cluster_labels)*n_centroids)
+    centroids = np.concatenate(centroids, axis=0)
+    cluster_labels = np.concatenate(cluster_labels, axis=0)
+    return centroids, cluster_labels
+
+
+def global_agglomerative(x_data, n_centroids):
+    agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
+    labels = agglomerative.fit_predict(x_data)
+    centroids = np.array([np.mean(x_data[labels == i], axis=0)
+                         for i in range(n_centroids)])
+    return centroids, labels
+
+
+def local_agglomerative(x_data, y_data, n_centroids):
+    centroids = []
+    cluster_labels = []
+
+    for label in set(y_data):
+        x_labeled = x_data[y_data == label]
+        agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
+        labels = agglomerative.fit_predict(x_labeled)
+        centroids.extend([np.mean(x_labeled[labels == i], axis=0)
+                         for i in range(n_centroids)])
+        cluster_labels.extend(labels + len(cluster_labels)*n_centroids)
+
+    return centroids, cluster_labels
+
+
+def global_dbscan(x_data, epsilon, min_samples):
+    dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
+    labels = dbscan.fit_predict(x_data)
+    unique_labels = [label for label in np.unique(labels) if label != -1]
+    centroids = [np.mean(x_data[labels == label], axis=0)
+                 for label in unique_labels]
+    return centroids, labels
+
+
+def local_dbscan(x_data, y_data, epsilon, min_samples):
+    centroids = []
+    cluster_labels = []
+
+    for idx, label in enumerate(set(y_data)):
+        x_labeled = x_data[y_data == label]
+        dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
+        labels = dbscan.fit_predict(x_labeled)
+        unique_labels = [label for label in np.unique(labels) if label != -1]
+        centroids.extend([np.mean(x_labeled[labels == label], axis=0)
+                         for label in unique_labels])
+        cluster_labels.extend(labels + idx*len(unique_labels))
+
+    return centroids, cluster_labels
+
+
+def measure_distances(x_data: np.ndarray, centroids: np.ndarray, metric: str = "euclidean"):
+    distances = np.empty((len(x_data), len(centroids)))
+
+    for i, point in enumerate(x_data):
+        for j, centroid in enumerate(centroids):
+            if metric == "euclidean":
+                distance = np.linalg.norm(point - centroid)
+            elif metric == "manhattan":
+                distance = np.sum(np.abs(point - centroid))
+            elif metric == "chebyshev":
+                distance = np.max(np.abs(point - centroid))
+        
+            distances[i, j] = distance
+
+    return distances
+
+
+def tsne_algorithms(x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, method: str, n_centroids: int, ax: int):
+    tsne = TSNE(n_components=2, random_state=42)
+    embedded_data = tsne.fit_transform(x_data)
+
+    scatter = ax.scatter(
+        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10')
+    
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
+
+    if method == "global":
+        ax.set_title(
+            f"{algorithms_name} with {n_centroids} global centroids")
+    else:
+        ax.set_title(
+            f"{algorithms_name} with {int(n_centroids)} local centroids per cluster")
+
+
+def tsne_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
+    tsne = TSNE(n_components=2, random_state=42)
+    embedded_data = tsne.fit_transform(x_data)
+
+    scatter = ax.scatter(embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10')
+    
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
+
+    ax.set_title(f"no centroids")
+
+def umap_algorithms(x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, method: str, n_centroids: int, ax: int):
+    reducer = umap.UMAP(random_state=42)
+    embedded_data = reducer.fit_transform(x_data)
+
+    scatter = ax.scatter(
+        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
+
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
+
+    if method == "global":
+        ax.set_title(f"{algorithms_name} with {n_centroids} global centroids")
+    else:
+        ax.set_title(f"{algorithms_name} with {int(n_centroids)} local centroids per cluster")
+        
+
+def umap_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
+    reducer = umap.UMAP(random_state=42)
+    embedded_data = reducer.fit_transform(x_data)
+
+    scatter = ax.scatter(
+        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
+
+    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
+
+    ax.set_title(f"no centroids")
+
+
 # zapisywanie i ladowanie wynikow w jakis sposob psuje kmeans lokalny
-# # n_centroids is a number of centroids we want to find in whole dataset
+# n_centroids is a number of centroids we want to find in whole dataset
 # def global_kmeans(x_data, n_centroids):
 #     centroids_folder, labels_folder = create_results_folders(
 #         "kmeans", "global")
@@ -63,7 +210,7 @@ def compute_centroids(algorithm: Literal["kmeans", "agglomerative", "dbscan"], m
 #     return centroids, labels
 
 
-# # n_centroids here is a number of centroids we want to find in each class
+# n_centroids here is a number of centroids we want to find in each class
 # def local_kmeans(x_data, y_data, n_centroids):
 #     centroids_folder, labels_folder = create_results_folders("kmeans", "local")
 
@@ -205,88 +352,6 @@ def compute_centroids(algorithm: Literal["kmeans", "agglomerative", "dbscan"], m
 #     return centroids, cluster_labels
 
 
-def global_kmeans(x_data, n_centroids):
-    kmeans = KMeans(n_clusters=n_centroids)
-    kmeans.fit(x_data)
-    centroids = kmeans.cluster_centers_
-    cluster_labels = kmeans.labels_
-
-    return centroids, cluster_labels
-
-
-# n_centroids here is a number of centroids we want to find in each class
-def local_kmeans(x_data, y_data, n_centroids):
-    centroids = []
-    cluster_labels = []
-
-    for label in set(y_data):
-        centroid, labels = global_kmeans(x_data[y_data == label], n_centroids)
-        centroids.append(centroid)
-        cluster_labels.append(labels + len(cluster_labels)*n_centroids)
-    centroids = np.concatenate(centroids, axis=0)
-    cluster_labels = np.concatenate(cluster_labels, axis=0)
-    return centroids, cluster_labels
-
-
-def global_agglomerative(x_data, n_centroids):
-    agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
-    labels = agglomerative.fit_predict(x_data)
-    centroids = np.array([np.mean(x_data[labels == i], axis=0)
-                         for i in range(n_centroids)])
-    return centroids, labels
-
-
-def local_agglomerative(x_data, y_data, n_centroids):
-    centroids = []
-    cluster_labels = []
-
-    for label in set(y_data):
-        x_labeled = x_data[y_data == label]
-        agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
-        labels = agglomerative.fit_predict(x_labeled)
-        centroids.extend([np.mean(x_labeled[labels == i], axis=0)
-                         for i in range(n_centroids)])
-        cluster_labels.extend(labels + len(cluster_labels)*n_centroids)
-
-    return centroids, cluster_labels
-
-
-def global_dbscan(x_data, epsilon, min_samples):
-    dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
-    labels = dbscan.fit_predict(x_data)
-    unique_labels = [label for label in np.unique(labels) if label != -1]
-    centroids = [np.mean(x_data[labels == label], axis=0)
-                 for label in unique_labels]
-    return centroids, labels
-
-
-def local_dbscan(x_data, y_data, epsilon, min_samples):
-    centroids = []
-    cluster_labels = []
-
-    for idx, label in enumerate(set(y_data)):
-        x_labeled = x_data[y_data == label]
-        dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
-        labels = dbscan.fit_predict(x_labeled)
-        unique_labels = [label for label in np.unique(labels) if label != -1]
-        centroids.extend([np.mean(x_labeled[labels == label], axis=0)
-                         for label in unique_labels])
-        cluster_labels.extend(labels + idx*len(unique_labels))
-
-    return centroids, cluster_labels
-
-
-def measure_distances(x_data: np.ndarray, centroids: np.ndarray):
-    distances = np.empty((len(x_data), len(centroids)))
-
-    for i, point in enumerate(x_data):
-        for j, centroid in enumerate(centroids):
-            distance = np.linalg.norm(point - centroid)
-            distances[i, j] = distance
-
-    return distances
-
-
 # def visualize_tsne(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
 #     combined_data = np.concatenate((x_data, centroids), axis=0)
 
@@ -312,36 +377,6 @@ def measure_distances(x_data: np.ndarray, centroids: np.ndarray):
 #     else:
 #         ax.set_title(
 #             f"{algorithms_name} with {int(len(centroids)/10)} local centroids per cluster")
-
-
-def tsne_algorithms(x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, method: str, n_centroids: int, ax: int):
-    tsne = TSNE(n_components=2, random_state=42)
-    embedded_data = tsne.fit_transform(x_data)
-
-    scatter = ax.scatter(
-        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10')
-    
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
-    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
-
-    if method == "global":
-        ax.set_title(
-            f"{algorithms_name} with {n_centroids} global centroids")
-    else:
-        ax.set_title(
-            f"{algorithms_name} with {int(n_centroids)/10} local centroids per cluster")
-
-
-def tsne_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
-    tsne = TSNE(n_components=2, random_state=42)
-    embedded_data = tsne.fit_transform(x_data)
-
-    scatter = ax.scatter(embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10')
-    
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
-    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
-
-    ax.set_title(f"no centroids")
 
 
 # def visualize_umap(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
@@ -375,31 +410,3 @@ def tsne_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
 #     else:
 #         ax.set_title(
 #             f"{algorithms_name} with {len(centroids)} local centroids per cluster")
-
-def umap_algorithms(x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, method: str, n_centroids: int, ax: int):
-    reducer = umap.UMAP(random_state=42)
-    embedded_data = reducer.fit_transform(x_data)
-
-    scatter = ax.scatter(
-        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
-
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
-    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
-
-    if method == "global":
-        ax.set_title(f"{algorithms_name} with {n_centroids} global centroids")
-    else:
-        ax.set_title(f"{algorithms_name} with {int(n_centroids)} local centroids per cluster")
-        
-
-def umap_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
-    reducer = umap.UMAP(random_state=42)
-    embedded_data = reducer.fit_transform(x_data)
-
-    scatter = ax.scatter(
-        embedded_data[:, 0], embedded_data[:, 1], c=cluster_labels, cmap='tab10', vmin=min(cluster_labels), vmax=max(cluster_labels), s=20, alpha=0.5)
-
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
-    ax.legend(handles=scatter.legend_elements()[0], labels=legend_labels, loc='upper right')
-
-    ax.set_title(f"no centroids")
