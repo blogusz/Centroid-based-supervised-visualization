@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import warnings
 import os
 from utils import create_results_folders
+import jarvispatrick
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -19,7 +20,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # method - global, local, hybrid
 def compute_centroids(algorithm: Literal["kmeans", "agglomerative", "dbscan"], method: Literal["global", "local"], x_data: np.ndarray, y_data: np.ndarray, n_centroids_local: int = 10, n_centroids_global: int = 10, epsilon: float = 1.0, min_samples: int = 1):
     if algorithm == "kmeans" and method == "global":
-        centroids, cluster_labels = global_kmeans(x_data, n_centroids_global)
+        centroids, cluster_labels = local_global_kmeans(x_data, n_centroids_global, True)
     elif algorithm == "kmeans" and method == "local":
         centroids, cluster_labels = local_kmeans(
             x_data, y_data, n_centroids_local)
@@ -49,66 +50,66 @@ def global_kmeans(x_data, n_centroids):
     return centroids, cluster_labels
 
 
-# n_centroids here is a number of centroids we want to find in each class
-def local_kmeans(x_data, y_data, n_centroids):
-    centroids = []
-    cluster_labels = []
+# # n_centroids here is a number of centroids we want to find in each class
+# def local_kmeans(x_data, y_data, n_centroids):
+#     centroids = []
+#     cluster_labels = []
 
-    for label in set(y_data):
-        centroid, labels = global_kmeans(x_data[y_data == label], n_centroids)
-        centroids.append(centroid)
-        cluster_labels.append(labels + len(cluster_labels)*n_centroids)
-    centroids = np.concatenate(centroids, axis=0)
-    cluster_labels = np.concatenate(cluster_labels, axis=0)
-    return centroids, cluster_labels
-
-
-def global_agglomerative(x_data, n_centroids):
-    agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
-    labels = agglomerative.fit_predict(x_data)
-    centroids = np.array([np.mean(x_data[labels == i], axis=0)
-                         for i in range(n_centroids)])
-    return centroids, labels
+#     for label in set(y_data):
+#         centroid, labels = global_kmeans(x_data[y_data == label], n_centroids)
+#         centroids.append(centroid)
+#         cluster_labels.append(labels + len(cluster_labels)*n_centroids)
+#     centroids = np.concatenate(centroids, axis=0)
+#     cluster_labels = np.concatenate(cluster_labels, axis=0)
+#     return centroids, cluster_labels
 
 
-def local_agglomerative(x_data, y_data, n_centroids):
-    centroids = []
-    cluster_labels = []
-
-    for label in set(y_data):
-        x_labeled = x_data[y_data == label]
-        agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
-        labels = agglomerative.fit_predict(x_labeled)
-        centroids.extend([np.mean(x_labeled[labels == i], axis=0)
-                         for i in range(n_centroids)])
-        cluster_labels.extend(labels + len(cluster_labels)*n_centroids)
-
-    return centroids, cluster_labels
+# def global_agglomerative(x_data, n_centroids):
+#     agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
+#     labels = agglomerative.fit_predict(x_data)
+#     centroids = np.array([np.mean(x_data[labels == i], axis=0)
+#                          for i in range(n_centroids)])
+#     return centroids, labels
 
 
-def global_dbscan(x_data, epsilon, min_samples):
-    dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
-    labels = dbscan.fit_predict(x_data)
-    unique_labels = [label for label in np.unique(labels) if label != -1]
-    centroids = [np.mean(x_data[labels == label], axis=0)
-                 for label in unique_labels]
-    return centroids, labels
+# def local_agglomerative(x_data, y_data, n_centroids):
+#     centroids = []
+#     cluster_labels = []
+
+#     for label in set(y_data):
+#         x_labeled = x_data[y_data == label]
+#         agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
+#         labels = agglomerative.fit_predict(x_labeled)
+#         centroids.extend([np.mean(x_labeled[labels == i], axis=0)
+#                          for i in range(n_centroids)])
+#         cluster_labels.extend(labels + len(cluster_labels)*n_centroids)
+
+#     return centroids, cluster_labels
 
 
-def local_dbscan(x_data, y_data, epsilon, min_samples):
-    centroids = []
-    cluster_labels = []
+# def global_dbscan(x_data, epsilon, min_samples):
+#     dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
+#     labels = dbscan.fit_predict(x_data)
+#     unique_labels = [label for label in np.unique(labels) if label != -1]
+#     centroids = [np.mean(x_data[labels == label], axis=0)
+#                  for label in unique_labels]
+#     return centroids, labels
 
-    for idx, label in enumerate(set(y_data)):
-        x_labeled = x_data[y_data == label]
-        dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
-        labels = dbscan.fit_predict(x_labeled)
-        unique_labels = [label for label in np.unique(labels) if label != -1]
-        centroids.extend([np.mean(x_labeled[labels == label], axis=0)
-                         for label in unique_labels])
-        cluster_labels.extend(labels + idx*len(unique_labels))
 
-    return centroids, cluster_labels
+# def local_dbscan(x_data, y_data, epsilon, min_samples):
+#     centroids = []
+#     cluster_labels = []
+
+#     for idx, label in enumerate(set(y_data)):
+#         x_labeled = x_data[y_data == label]
+#         dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
+#         labels = dbscan.fit_predict(x_labeled)
+#         unique_labels = [label for label in np.unique(labels) if label != -1]
+#         centroids.extend([np.mean(x_labeled[labels == label], axis=0)
+#                          for label in unique_labels])
+#         cluster_labels.extend(labels + idx*len(unique_labels))
+
+#     return centroids, cluster_labels
 
 
 def measure_distances(x_data: np.ndarray, centroids: np.ndarray, metric: str = "euclidean"):
@@ -209,147 +210,171 @@ def umap_clean(x_data: np.ndarray, cluster_labels: np.ndarray, ax: int):
 
 #     return centroids, labels
 
+def local_global_kmeans(x_data: np.ndarray, n_centroids, only_global: Literal[True, False]):
+    if only_global: # if we want to compute global centroids we are going to save the results in a file
+        centroids_folder, labels_folder = create_results_folders(
+            "kmeans", "global")
+        centroids_file = os.path.join(
+            centroids_folder, f"centroids_{n_centroids}.npy")
+        labels_file = os.path.join(labels_folder, f"labels_{n_centroids}.npy")
+
+        if os.path.exists(centroids_file) and os.path.exists(labels_file) and os.path.getsize(centroids_file) > 0 and os.path.getsize(labels_file) > 0:
+            centroids = np.load(centroids_file)
+            labels = np.load(labels_file)
+        else:
+            centroids, labels=global_kmeans(x_data, n_centroids)
+
+            np.save(centroids_file, centroids)
+            np.save(labels_file, labels)
+    else:
+        centroids, labels=global_kmeans(x_data, n_centroids)
+
+    return centroids, labels
+
+
 
 # n_centroids here is a number of centroids we want to find in each class
-# def local_kmeans(x_data, y_data, n_centroids):
-#     centroids_folder, labels_folder = create_results_folders("kmeans", "local")
+def local_kmeans(x_data: np.ndarray, y_data: np.ndarray, n_centroids):
+    centroids_folder, labels_folder = create_results_folders("kmeans", "local")
 
-#     centroids = []
-#     cluster_labels = []
+    centroids = []
+    cluster_labels = []
 
-#     for label in set(y_data):
-#         centroid_file = os.path.join(
-#             centroids_folder, f"kmeans_local_{label}_{n_centroids}_centroids.npy")
-#         labels_file = os.path.join(
-#             labels_folder, f"kmeans_local_{label}_{n_centroids}_labels.npy")
+    for label in set(y_data):
+        centroid_file = os.path.join(
+            centroids_folder, f"kmeans_local_{label}_{n_centroids}_centroids.npy")
+        labels_file = os.path.join(
+            labels_folder, f"kmeans_local_{label}_{n_centroids}_labels.npy")
 
-#         if os.path.exists(centroid_file) and os.path.exists(labels_file) and os.path.getsize(centroid_file) > 0 and os.path.getsize(labels_file) > 0:
-#             centroid = np.load(centroid_file)
-#             labels = np.load(labels_file)
-#         else:
-#             centroid, labels = global_kmeans(
-#                 x_data[y_data == label], n_centroids)
-#             np.save(centroid_file, centroid)
-#             np.save(labels_file, labels)
+        if os.path.exists(centroid_file) and os.path.exists(labels_file) and os.path.getsize(centroid_file) > 0 and os.path.getsize(labels_file) > 0:
+            centroid = np.load(centroid_file)
+            labels = np.load(labels_file)
+        else:
+            centroid, labels = local_global_kmeans(
+                x_data[y_data == label], n_centroids, False)
+            np.save(centroid_file, centroid)
+            np.save(labels_file, labels)
 
-#         centroids.append(centroid)
-#         cluster_labels.append(labels + len(cluster_labels) * n_centroids)
+        centroids.append(centroid)
+        cluster_labels.append(labels + len(cluster_labels) * n_centroids)
 
-#     centroids = np.concatenate(centroids, axis=0)
-#     cluster_labels = np.concatenate(cluster_labels, axis=0)
+    centroids = np.concatenate(centroids, axis=0)
+    cluster_labels = np.concatenate(cluster_labels, axis=0)
 
-#     return centroids, cluster_labels
-
-
-# def global_agglomerative(x_data, n_centroids):
-#     centroids_folder, labels_folder = create_results_folders(
-#         "agglomerative", "global")
-#     centroids_file = os.path.join(
-#         centroids_folder, f"centroids_{n_centroids}.npy")
-#     labels_file = os.path.join(labels_folder, f"labels_{n_centroids}.npy")
-
-#     if os.path.exists(centroids_file) and os.path.exists(labels_file) and os.path.getsize(centroids_file) > 0 and os.path.getsize(labels_file) > 0:
-#         centroids = np.load(centroids_file)
-#         labels = np.load(labels_file)
-#     else:
-#         agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
-#         labels = agglomerative.fit_predict(x_data)
-#         centroids = np.array([np.mean(x_data[labels == i], axis=0)
-#                               for i in range(n_centroids)])
-
-#         np.save(centroids_file, centroids)
-#         np.save(labels_file, labels)
-
-#     return centroids, labels
+    return centroids, cluster_labels
 
 
-# def local_agglomerative(x_data, y_data, n_centroids):
-#     centroids_folder, labels_folder = create_results_folders(
-#         "agglomerative", "local")
+def global_agglomerative(x_data, n_centroids):
+    centroids_folder, labels_folder = create_results_folders(
+        "agglomerative", "global")
+    centroids_file = os.path.join(
+        centroids_folder, f"centroids_{n_centroids}.npy")
+    labels_file = os.path.join(labels_folder, f"labels_{n_centroids}.npy")
 
-#     centroids = []
-#     cluster_labels = []
+    if os.path.exists(centroids_file) and os.path.exists(labels_file) and os.path.getsize(centroids_file) > 0 and os.path.getsize(labels_file) > 0:
+        centroids = np.load(centroids_file)
+        labels = np.load(labels_file)
+    else:
+        agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
+        labels = agglomerative.fit_predict(x_data)
+        centroids = np.array([np.mean(x_data[labels == i], axis=0)
+                              for i in range(n_centroids)])
 
-#     for label in set(y_data):
-#         centroid_file = os.path.join(
-#             centroids_folder, f"agglomerative_local_{label}_{n_centroids}_centroids.npy")
-#         labels_file = os.path.join(
-#             labels_folder, f"agglomerative_local_{label}_{n_centroids}_labels.npy")
+        np.save(centroids_file, centroids)
+        np.save(labels_file, labels)
 
-#         if os.path.exists(centroid_file) and os.path.exists(labels_file) and os.path.getsize(centroid_file) > 0 and os.path.getsize(labels_file) > 0:
-#             centroid = np.load(centroid_file)
-#             labels = np.load(labels_file)
-#         else:
-#             x_labeled = x_data[y_data == label]
-#             agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
-#             labels = agglomerative.fit_predict(x_labeled)
-#             centroid = np.array([np.mean(x_labeled[labels == i], axis=0)
-#                                  for i in range(n_centroids)])
-
-#             np.save(centroid_file, centroid)
-#             np.save(labels_file, labels)
-
-#         centroids.append(centroid)
-#         cluster_labels.append(labels + len(cluster_labels) * n_centroids)
-
-#     centroids = np.concatenate(centroids, axis=0)
-#     cluster_labels = np.concatenate(cluster_labels, axis=0)
-
-#     return centroids, cluster_labels
+    return centroids, labels
 
 
-# def global_dbscan(x_data, epsilon, min_samples):
-#     centroids_folder, labels_folder = create_results_folders(
-#         "dbscan", "global")
-#     centroids_file = os.path.join(centroids_folder, "centroids.npy")
-#     labels_file = os.path.join(labels_folder, "labels.npy")
+def local_agglomerative(x_data, y_data, n_centroids):
+    centroids_folder, labels_folder = create_results_folders(
+        "agglomerative", "local")
 
-#     if os.path.exists(centroids_file) and os.path.exists(labels_file) and os.path.getsize(centroids_file) > 0 and os.path.getsize(labels_file) > 0:
-#         centroids = np.load(centroids_file)
-#         labels = np.load(labels_file)
-#     else:
-#         dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
-#         labels = dbscan.fit_predict(x_data)
-#         unique_labels = [label for label in np.unique(labels) if label != -1]
-#         centroids = [np.mean(x_data[labels == label], axis=0)
-#                      for label in unique_labels]
-#         np.save(centroids_file, centroids)
-#         np.save(labels_file, labels)
+    centroids = []
+    cluster_labels = []
 
-#     return centroids, labels
+    for label in set(y_data):
+        centroid_file = os.path.join(
+            centroids_folder, f"agglomerative_local_{label}_{n_centroids}_centroids.npy")
+        labels_file = os.path.join(
+            labels_folder, f"agglomerative_local_{label}_{n_centroids}_labels.npy")
+
+        if os.path.exists(centroid_file) and os.path.exists(labels_file) and os.path.getsize(centroid_file) > 0 and os.path.getsize(labels_file) > 0:
+            centroid = np.load(centroid_file)
+            labels = np.load(labels_file)
+        else:
+            x_labeled = x_data[y_data == label]
+            agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
+            labels = agglomerative.fit_predict(x_labeled)
+            centroid = np.array([np.mean(x_labeled[labels == i], axis=0)
+                                 for i in range(n_centroids)])
+
+            np.save(centroid_file, centroid)
+            np.save(labels_file, labels)
+
+        centroids.append(centroid)
+        cluster_labels.append(labels + len(cluster_labels) * n_centroids)
+
+    centroids = np.concatenate(centroids, axis=0)
+    cluster_labels = np.concatenate(cluster_labels, axis=0)
+
+    return centroids, cluster_labels
 
 
-# def local_dbscan(x_data, y_data, epsilon, min_samples):
-#     centroids_folder, labels_folder = create_results_folders(
-#         "dbscan", "local")
+def global_dbscan(x_data, epsilon, min_samples):
+    centroids_folder, labels_folder = create_results_folders(
+        "dbscan", "global")
+    centroids_file = os.path.join(centroids_folder, "centroids.npy")
+    labels_file = os.path.join(labels_folder, "labels.npy")
 
-#     centroids_file = os.path.join(centroids_folder, "centroids.npy")
-#     labels_file = os.path.join(labels_folder, "labels.npy")
+    if os.path.exists(centroids_file) and os.path.exists(labels_file) and os.path.getsize(centroids_file) > 0 and os.path.getsize(labels_file) > 0:
+        centroids = np.load(centroids_file)
+        labels = np.load(labels_file)
+    else:
+        dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
+        labels = dbscan.fit_predict(x_data)
+        unique_labels = [label for label in np.unique(labels) if label != -1]
+        centroids = [np.mean(x_data[labels == label], axis=0)
+                     for label in unique_labels]
+        np.save(centroids_file, centroids)
+        np.save(labels_file, labels)
 
-#     if os.path.exists(centroids_file) and os.path.exists(labels_file) and os.path.getsize(centroids_file) > 0 and os.path.getsize(labels_file) > 0:
-#         centroids = np.load(centroids_file)
-#         cluster_labels = np.load(labels_file)
-#     else:
-#         centroids = []
-#         cluster_labels = []
+    return centroids, labels
 
-#         for idx, label in enumerate(set(y_data)):
-#             x_labeled = x_data[y_data == label]
-#             dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
-#             labels_local = dbscan.fit_predict(x_labeled)
-#             unique_labels = [label for label in np.unique(
-#                 labels_local) if label != -1]
-#             centroids.extend([np.mean(x_labeled[labels_local == label], axis=0)
-#                               for label in unique_labels])
-#             cluster_labels.extend(labels_local + idx * len(unique_labels))
 
-#         centroids = np.array(centroids)
-#         cluster_labels = np.array(cluster_labels)
+def local_dbscan(x_data, y_data, epsilon, min_samples):
+    centroids_folder, labels_folder = create_results_folders(
+        "dbscan", "local")
 
-#         np.save(centroids_file, centroids)
-#         np.save(labels_file, cluster_labels)
+    centroids_file = os.path.join(centroids_folder, "centroids.npy")
+    labels_file = os.path.join(labels_folder, "labels.npy")
 
-#     return centroids, cluster_labels
+    if os.path.exists(centroids_file) and os.path.exists(labels_file) and os.path.getsize(centroids_file) > 0 and os.path.getsize(labels_file) > 0:
+        centroids = np.load(centroids_file)
+        cluster_labels = np.load(labels_file)
+    else:
+        centroids = []
+        cluster_labels = []
+
+        for idx, label in enumerate(set(y_data)):
+            x_labeled = x_data[y_data == label]
+            dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
+            labels_local = dbscan.fit_predict(x_labeled)
+            unique_labels = [label for label in np.unique(
+                labels_local) if label != -1]
+            centroids.extend([np.mean(x_labeled[labels_local == label], axis=0)
+                              for label in unique_labels])
+            cluster_labels.extend(labels_local + idx * len(unique_labels))
+
+        centroids = np.array(centroids)
+        cluster_labels = np.array(cluster_labels)
+
+        np.save(centroids_file, centroids)
+        np.save(labels_file, cluster_labels)
+
+    return centroids, cluster_labels
+        
+
 
 
 # def visualize_tsne(x_data: np.ndarray, cluster_labels: np.ndarray, centroids: np.ndarray, algorithms_name: str, method: str, ax: int):
