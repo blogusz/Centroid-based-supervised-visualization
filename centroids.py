@@ -13,7 +13,7 @@ import warnings
 import os
 import pickle
 from utils import *
-import jarvispatrick
+from jarvis_patrick import JP
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # algorithm is a clustering algorithm we want to use
 # method - global, local, hybrid
 def compute_centroids(
-    algorithm: Literal["kmeans", "agglomerative", "dbscan"],
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
     method: Literal["global", "local"],
     x_data: np.ndarray,
     y_data: np.ndarray,
@@ -29,6 +29,8 @@ def compute_centroids(
     n_centroids_global: int = 10,
     epsilon: float = 1.0,
     min_samples: int = 1,
+    k: int=100,
+    kmin: int=50
 ):
     if algorithm == "kmeans" and method == "global":
         centroids, cluster_labels = local_global_kmeans(
@@ -46,6 +48,10 @@ def compute_centroids(
         centroids, cluster_labels = global_dbscan(x_data, epsilon, min_samples)
     elif algorithm == "dbscan" and method == "local":
         centroids, cluster_labels = local_dbscan(x_data, y_data, epsilon, min_samples)
+    elif algorithm=="jp" and method=="global":
+        centroids, cluster_labels = local_global_jp(x_data, k, kmin, True)
+    elif algorithm=="jp" and method=="local":
+        centroids, cluster_labels = local_jarvis_patrick(x_data, y_data, k, kmin)
     else:
         print("Not defined yet")
     return np.array(centroids), np.array(cluster_labels)
@@ -84,7 +90,7 @@ def local_global_kmeans(
 
             np.save(centroids_file, centroids)
             np.save(labels_file, labels)
-    else:
+    else: # if we want to use the function to compute local centroids we dont save as its saved in local_kmeans function
         centroids, labels = global_kmeans(x_data, n_centroids)
 
     return centroids, labels
@@ -266,6 +272,80 @@ def local_dbscan(x_data, y_data, epsilon, min_samples):
 
     return centroids, cluster_labels
 
+def global_jarvis_patrick(x_data, k, kmin):
+    jp=JP(k, kmin)
+    clusters=jp.fit(x_data)
+    cluster_labels=[None]*len(x_data)
+    centroids=[]
+    for row_index, row in enumerate(clusters):
+        c = np.mean(x_data[row], axis=0)
+        centroids.append(list(c))
+        for i in row:
+            cluster_labels[i]=row_index
+    return centroids, cluster_labels
+
+def local_global_jp(x_data, k, kmin, only_global: Literal[True, False]):
+    if only_global:
+        centroids_folder, labels_folder = create_algorithm_directory("jp", "global")
+        centroids_file = os.path.join(centroids_folder, f"centroids_{k}_{kmin}.npy")
+        labels_file = os.path.join(labels_folder, f"labels_{k}_{kmin}.npy")
+
+        if (
+            os.path.exists(centroids_file)
+            and os.path.exists(labels_file)
+            and os.path.getsize(centroids_file) > 0
+            and os.path.getsize(labels_file) > 0
+        ):
+            centroids = np.load(centroids_file)
+            labels = np.load(labels_file)
+        else:
+            centroids, labels = global_jarvis_patrick(x_data, k, kmin)
+
+            np.save(centroids_file, centroids)
+            np.save(labels_file, labels)
+    else: # if we want to use the function to compute local centroids we dont save as its saved in local_kmeans function
+        centroids, labels = global_jarvis_patrick(x_data, k, kmin)
+
+    return centroids, labels
+
+# n_centroids here is a number of centroids we want to find in each class
+def local_jarvis_patrick(x_data: np.ndarray, y_data: np.ndarray, k, kmin):
+    centroids_folder, labels_folder = create_algorithm_directory("jp", "local")
+
+    centroids = []
+    cluster_labels = []
+
+    for label in set(y_data):
+        centroid_file = os.path.join(
+            centroids_folder, f"jp_local_{label}_{k}_{kmin}_centroids.npy"
+        )
+        labels_file = os.path.join(
+            labels_folder, f"jp_local_{label}_{k}_{kmin}_labels.npy"
+        )
+
+        if (
+            os.path.exists(centroid_file)
+            and os.path.exists(labels_file)
+            and os.path.getsize(centroid_file) > 0
+            and os.path.getsize(labels_file) > 0
+        ):
+            centroid = np.load(centroid_file)
+            labels = np.load(labels_file)
+        else:
+            centroid, labels = local_global_jp(
+                x_data[y_data == label], k, kmin, False
+            )
+            np.save(centroid_file, centroid)
+            np.save(labels_file, labels)
+
+        centroids.append(centroid)
+        cluster_labels.append(labels)
+        # cluster_labels.append(labels + len(cluster_labels) * n_centroids)
+
+    centroids = np.concatenate(centroids, axis=0)
+    cluster_labels = np.concatenate(cluster_labels, axis=0)
+
+    return centroids, cluster_labels
 
 def measure_distances(
     x_data: np.ndarray,
