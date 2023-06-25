@@ -95,8 +95,8 @@ def local_global_kmeans(
 
 # n_centroids here is a number of centroids we want to find in each class
 def local_kmeans(x_data: np.ndarray, y_data: np.ndarray, n_centroids):
+    n_centroids = int(n_centroids)
     centroids_folder, labels_folder = create_algorithm_directory("kmeans", "local")
-
     centroids = []
     cluster_labels = []
 
@@ -164,6 +164,7 @@ def local_agglomerative(x_data, y_data, n_centroids):
     centroids_folder, labels_folder = create_algorithm_directory(
         "agglomerative", "local"
     )
+    n_centroids = int(n_centroids)
 
     centroids = []
     cluster_labels = []
@@ -351,10 +352,12 @@ def measure_distances(
     centroids: np.ndarray,
     algorithm: str,
     method: str,
-    n_centroids: int,
     metric: str = "euclidean",
 ):
-    n_centroids = int(n_centroids)
+    n_centroids = len(centroids)
+    if algorithm not in ["dbscan", "jp"] and method == "local":
+        n_centroids = int(n_centroids / 10)
+
     distances_file = os.path.join(
         create_directory(algorithm, method, "distances"),
         f"distances_{method}_{n_centroids}.pkl",
@@ -362,7 +365,7 @@ def measure_distances(
     if os.path.exists(distances_file) and os.path.getsize(distances_file) > 0:
         distances = pickle.load(open(distances_file, "rb"))
     else:
-        distances = np.empty((len(x_data), len(centroids)))
+        distances = np.empty((len(x_data), n_centroids))
 
         for i, point in enumerate(x_data):
             for j, centroid in enumerate(centroids):
@@ -382,20 +385,21 @@ def measure_distances(
 
 def tsne_algorithms(
     x_data: np.ndarray,
-    cluster_labels: np.ndarray,
-    algorithms_name: str,
+    y_data: np.ndarray,
+    algorithm: str,
     method: str,
-    n_centroids: int,
     ax: int,
 ):
-    n_centroids = int(n_centroids)
+    n_centroids = x_data.shape[1]
+    if algorithm not in ["dbscan", "jp"] and method == "local":
+        n_centroids = int(n_centroids / 10)
 
     tsne_file = os.path.join(
-        create_directory(algorithms_name, method, "data", "tsne"),
+        create_directory(algorithm, method, "data", "tsne"),
         f"tsne_{method}_{n_centroids}.pkl",
     )
     tsne_image_file = os.path.join(
-        create_directory(algorithms_name, method, "images", "tsne"),
+        create_directory(algorithm, method, "images", "tsne"),
         f"tsne_{method}_{n_centroids}.png",
     )
 
@@ -410,25 +414,23 @@ def tsne_algorithms(
     scatter = ax.scatter(
         embedded_data[:, 0],
         embedded_data[:, 1],
-        c=cluster_labels,
+        c=y_data,
         cmap="tab10",
-        vmin=min(cluster_labels),
-        vmax=max(cluster_labels),
+        vmin=min(y_data),
+        vmax=max(y_data),
         s=20,
         alpha=0.5,
     )
 
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    legend_labels = [f"Cluster {label}" for label in np.unique(y_data)]
     ax.legend(
         handles=scatter.legend_elements()[0], labels=legend_labels, loc="upper right"
     )
 
     if method == "global":
-        ax.set_title(f"{algorithms_name} with {n_centroids} global centroids")
+        ax.set_title(f"{algorithm} with {n_centroids} global centroids")
     else:
-        ax.set_title(
-            f"{algorithms_name} with {n_centroids} local centroids per cluster"
-        )
+        ax.set_title(f"{algorithm} with {n_centroids} local centroids per cluster")
 
     # saving selected part of the whole figure
     if method == "global":
@@ -438,14 +440,12 @@ def tsne_algorithms(
     ax.figure.savefig(tsne_image_file, bbox_inches=bbox)
 
 
-def tsne_clean(
-    x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, ax: int
-):
+def tsne_clean(x_data: np.ndarray, y_data: np.ndarray, algorithm: str, ax: int):
     tsne_file = os.path.join(
-        create_directory(algorithms_name, "global", "data", "tsne"), "tsne_clean.pkl"
+        create_directory(algorithm, "global", "data", "tsne"), "tsne_clean.pkl"
     )
     tsne_image_file = os.path.join(
-        create_directory(algorithms_name, "global", "images", "tsne"), "tsne_clean.png"
+        create_directory(algorithm, "global", "images", "tsne"), "tsne_clean.png"
     )
 
     if os.path.exists(tsne_file) and os.path.getsize(tsne_file) > 0:
@@ -457,22 +457,22 @@ def tsne_clean(
 
         # saving figure in local centroids directory
         tsne_file = os.path.join(
-            create_directory(algorithms_name, "local", "data", "tsne"), "tsne_clean.pkl"
+            create_directory(algorithm, "local", "data", "tsne"), "tsne_clean.pkl"
         )
         pickle.dump(embedded_data, open(tsne_file, "wb"))
 
     scatter = ax.scatter(
         embedded_data[:, 0],
         embedded_data[:, 1],
-        c=cluster_labels,
+        c=y_data,
         cmap="tab10",
-        vmin=min(cluster_labels),
-        vmax=max(cluster_labels),
+        vmin=min(y_data),
+        vmax=max(y_data),
         s=20,
         alpha=0.5,
     )
 
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    legend_labels = [f"Cluster {label}" for label in np.unique(y_data)]
     ax.legend(
         handles=scatter.legend_elements()[0], labels=legend_labels, loc="upper right"
     )
@@ -484,27 +484,28 @@ def tsne_clean(
 
     # saving figure in global centroids directory
     tsne_image_file = os.path.join(
-        create_directory(algorithms_name, "local", "images", "tsne"), "tsne_clean.png"
+        create_directory(algorithm, "local", "images", "tsne"), "tsne_clean.png"
     )
     ax.figure.savefig(tsne_image_file, bbox_inches=bbox)
 
 
 def umap_algorithms(
     x_data: np.ndarray,
-    cluster_labels: np.ndarray,
-    algorithms_name: str,
+    y_data: np.ndarray,
+    algorithm: str,
     method: str,
-    n_centroids: int,
     ax: int,
 ):
-    n_centroids = int(n_centroids)
+    n_centroids = x_data.shape[1]
+    if algorithm not in ["dbscan", "jp"] and method == "local":
+        n_centroids = int(n_centroids / 10)
 
     umap_file = os.path.join(
-        create_directory(algorithms_name, method, "data", "umap"),
+        create_directory(algorithm, method, "data", "umap"),
         f"umap_{method}_{n_centroids}.pkl",
     )
     umap_image_file = os.path.join(
-        create_directory(algorithms_name, method, "images", "umap"),
+        create_directory(algorithm, method, "images", "umap"),
         f"umap_{method}_{n_centroids}.png",
     )
 
@@ -519,25 +520,23 @@ def umap_algorithms(
     scatter = ax.scatter(
         embedded_data[:, 0],
         embedded_data[:, 1],
-        c=cluster_labels,
+        c=y_data,
         cmap="tab10",
-        vmin=min(cluster_labels),
-        vmax=max(cluster_labels),
+        vmin=min(y_data),
+        vmax=max(y_data),
         s=20,
         alpha=0.5,
     )
 
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    legend_labels = [f"Cluster {label}" for label in np.unique(y_data)]
     ax.legend(
         handles=scatter.legend_elements()[0], labels=legend_labels, loc="upper right"
     )
 
     if method == "global":
-        ax.set_title(f"{algorithms_name} with {n_centroids} global centroids")
+        ax.set_title(f"{algorithm} with {n_centroids} global centroids")
     else:
-        ax.set_title(
-            f"{algorithms_name} with {n_centroids} local centroids per cluster"
-        )
+        ax.set_title(f"{algorithm} with {n_centroids} local centroids per cluster")
 
     # saving selected part of the whole figure
     if method == "global":
@@ -547,14 +546,12 @@ def umap_algorithms(
     ax.figure.savefig(umap_image_file, bbox_inches=bbox)
 
 
-def umap_clean(
-    x_data: np.ndarray, cluster_labels: np.ndarray, algorithms_name: str, ax: int
-):
+def umap_clean(x_data: np.ndarray, y_data: np.ndarray, algorithm: str, ax: int):
     umap_file = os.path.join(
-        create_directory(algorithms_name, "global", "data", "umap"), "umap_clean.pkl"
+        create_directory(algorithm, "global", "data", "umap"), "umap_clean.pkl"
     )
     umap_image_file = os.path.join(
-        create_directory(algorithms_name, "global", "images", "umap"), "umap_clean.png"
+        create_directory(algorithm, "global", "images", "umap"), "umap_clean.png"
     )
 
     if os.path.exists(umap_file) and os.path.getsize(umap_file) > 0:
@@ -566,7 +563,7 @@ def umap_clean(
 
         # saving figure in local centroids directory
         umap_file = os.path.join(
-            create_directory(algorithms_name, "local", "data", "umap"),
+            create_directory(algorithm, "local", "data", "umap"),
             "umap_clean.pkl",
         )
         pickle.dump(embedded_data, open(umap_file, "wb"))
@@ -574,15 +571,15 @@ def umap_clean(
     scatter = ax.scatter(
         embedded_data[:, 0],
         embedded_data[:, 1],
-        c=cluster_labels,
+        c=y_data,
         cmap="tab10",
-        vmin=min(cluster_labels),
-        vmax=max(cluster_labels),
+        vmin=min(y_data),
+        vmax=max(y_data),
         s=20,
         alpha=0.5,
     )
 
-    legend_labels = [f"Cluster {label}" for label in np.unique(cluster_labels)]
+    legend_labels = [f"Cluster {label}" for label in np.unique(y_data)]
     ax.legend(
         handles=scatter.legend_elements()[0], labels=legend_labels, loc="upper right"
     )
@@ -594,6 +591,6 @@ def umap_clean(
 
     # saving figure in global centroids directory
     umap_image_file = os.path.join(
-        create_directory(algorithms_name, "local", "images", "umap"), "umap_clean.png"
+        create_directory(algorithm, "local", "images", "umap"), "umap_clean.png"
     )
     ax.figure.savefig(umap_image_file, bbox_inches=bbox)
