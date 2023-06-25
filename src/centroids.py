@@ -4,7 +4,10 @@ from typing_extensions import Literal
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.cluster import DBSCAN
+
 from sklearn.manifold import TSNE
+
+# from tsnecuda import TSNE
 import matplotlib.transforms as transforms
 import warnings
 import os
@@ -55,7 +58,7 @@ def compute_centroids(
 
 
 # n_centroids is a number of centroids we want to find in whole dataset
-def global_kmeans(x_data, n_centroids):
+def global_kmeans(x_data: np.ndarray, n_centroids: int):
     kmeans = KMeans(n_clusters=n_centroids)
     kmeans.fit(x_data)
     centroids = kmeans.cluster_centers_
@@ -64,9 +67,7 @@ def global_kmeans(x_data, n_centroids):
     return centroids, cluster_labels
 
 
-def local_global_kmeans(
-    x_data: np.ndarray, n_centroids, only_global: Literal[True, False]
-):
+def local_global_kmeans(x_data: np.ndarray, n_centroids: int, only_global: bool):
     if (
         only_global
     ):  # if we want to compute global centroids we are going to save the results in a file
@@ -94,7 +95,7 @@ def local_global_kmeans(
 
 
 # n_centroids here is a number of centroids we want to find in each class
-def local_kmeans(x_data: np.ndarray, y_data: np.ndarray, n_centroids):
+def local_kmeans(x_data: np.ndarray, y_data: np.ndarray, n_centroids: int):
     n_centroids = int(n_centroids)
     centroids_folder, labels_folder = create_algorithm_directory("kmeans", "local")
     centroids = []
@@ -132,7 +133,7 @@ def local_kmeans(x_data: np.ndarray, y_data: np.ndarray, n_centroids):
     return centroids, cluster_labels
 
 
-def global_agglomerative(x_data, n_centroids):
+def global_agglomerative(x_data: np.ndarray, n_centroids: int):
     centroids_folder, labels_folder = create_algorithm_directory(
         "agglomerative", "global"
     )
@@ -160,7 +161,7 @@ def global_agglomerative(x_data, n_centroids):
     return centroids, labels
 
 
-def local_agglomerative(x_data, y_data, n_centroids):
+def local_agglomerative(x_data: np.ndarray, y_data: np.ndarray, n_centroids: int):
     centroids_folder, labels_folder = create_algorithm_directory(
         "agglomerative", "local"
     )
@@ -205,7 +206,7 @@ def local_agglomerative(x_data, y_data, n_centroids):
     return centroids, cluster_labels
 
 
-def global_dbscan(x_data, epsilon, min_samples):
+def global_dbscan(x_data: np.ndarray, epsilon: float, min_samples: int):
     centroids_folder, labels_folder = create_algorithm_directory("dbscan", "global")
     centroids_file = os.path.join(centroids_folder, "centroids.npy")
     labels_file = os.path.join(labels_folder, "labels.npy")
@@ -231,7 +232,9 @@ def global_dbscan(x_data, epsilon, min_samples):
     return centroids, labels
 
 
-def local_dbscan(x_data, y_data, epsilon, min_samples):
+def local_dbscan(
+    x_data: np.ndarray, y_data: np.ndarray, epsilon: float, min_samples: int
+):
     centroids_folder, labels_folder = create_algorithm_directory("dbscan", "local")
 
     centroids_file = os.path.join(centroids_folder, "centroids.npy")
@@ -271,7 +274,7 @@ def local_dbscan(x_data, y_data, epsilon, min_samples):
     return centroids, cluster_labels
 
 
-def global_jarvis_patrick(x_data, k, kmin):
+def global_jarvis_patrick(x_data: np.ndarray, k: int, kmin: int):
     jp = JP(k, kmin)
     clusters = jp.fit(x_data)
     cluster_labels = [None] * len(x_data)
@@ -284,7 +287,7 @@ def global_jarvis_patrick(x_data, k, kmin):
     return centroids, cluster_labels
 
 
-def local_global_jp(x_data, k, kmin, only_global: Literal[True, False]):
+def local_global_jp(x_data: np.ndarray, k: int, kmin: int, only_global: bool):
     if only_global:
         centroids_folder, labels_folder = create_algorithm_directory("jp", "global")
         centroids_file = os.path.join(centroids_folder, f"centroids_{k}_{kmin}.npy")
@@ -310,7 +313,7 @@ def local_global_jp(x_data, k, kmin, only_global: Literal[True, False]):
 
 
 # n_centroids here is a number of centroids we want to find in each class
-def local_jarvis_patrick(x_data: np.ndarray, y_data: np.ndarray, k, kmin):
+def local_jarvis_patrick(x_data: np.ndarray, y_data: np.ndarray, k: int, kmin: int):
     centroids_folder, labels_folder = create_algorithm_directory("jp", "local")
 
     centroids = []
@@ -350,9 +353,9 @@ def local_jarvis_patrick(x_data: np.ndarray, y_data: np.ndarray, k, kmin):
 def measure_distances(
     x_data: np.ndarray,
     centroids: np.ndarray,
-    algorithm: str,
-    method: str,
-    metric: str = "euclidean",
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
+    method: Literal["global", "local"],
+    metric: Literal["euclidean", "manhattan", "chebyshev"] = "euclidean",
 ):
     n_centroids = len(centroids)
     if algorithm not in ["dbscan", "jp"] and method == "local":
@@ -365,7 +368,7 @@ def measure_distances(
     if os.path.exists(distances_file) and os.path.getsize(distances_file) > 0:
         distances = pickle.load(open(distances_file, "rb"))
     else:
-        distances = np.empty((len(x_data), n_centroids))
+        distances = np.empty((len(x_data), len(centroids)))
 
         for i, point in enumerate(x_data):
             for j, centroid in enumerate(centroids):
@@ -386,8 +389,8 @@ def measure_distances(
 def tsne_algorithms(
     x_data: np.ndarray,
     y_data: np.ndarray,
-    algorithm: str,
-    method: str,
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
+    method: Literal["global", "local"],
     ax: int,
 ):
     n_centroids = x_data.shape[1]
@@ -407,6 +410,7 @@ def tsne_algorithms(
         embedded_data = pickle.load(open(tsne_file, "rb"))
     else:
         tsne = TSNE(n_components=2, random_state=42)
+        # tsne = TSNE(n_components=2)
         embedded_data = tsne.fit_transform(x_data)
 
         pickle.dump(embedded_data, open(tsne_file, "wb"))
@@ -440,7 +444,12 @@ def tsne_algorithms(
     ax.figure.savefig(tsne_image_file, bbox_inches=bbox)
 
 
-def tsne_clean(x_data: np.ndarray, y_data: np.ndarray, algorithm: str, ax: int):
+def tsne_clean(
+    x_data: np.ndarray,
+    y_data: np.ndarray,
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
+    ax: int,
+):
     tsne_file = os.path.join(
         create_directory(algorithm, "global", "data", "tsne"), "tsne_clean.pkl"
     )
@@ -452,6 +461,7 @@ def tsne_clean(x_data: np.ndarray, y_data: np.ndarray, algorithm: str, ax: int):
         embedded_data = pickle.load(open(tsne_file, "rb"))
     else:
         tsne = TSNE(n_components=2, random_state=42)
+        # tsne = TSNE(n_components=2)
         embedded_data = tsne.fit_transform(x_data)
         pickle.dump(embedded_data, open(tsne_file, "wb"))
 
@@ -492,8 +502,8 @@ def tsne_clean(x_data: np.ndarray, y_data: np.ndarray, algorithm: str, ax: int):
 def umap_algorithms(
     x_data: np.ndarray,
     y_data: np.ndarray,
-    algorithm: str,
-    method: str,
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
+    method: Literal["global", "local"],
     ax: int,
 ):
     n_centroids = x_data.shape[1]
@@ -546,7 +556,12 @@ def umap_algorithms(
     ax.figure.savefig(umap_image_file, bbox_inches=bbox)
 
 
-def umap_clean(x_data: np.ndarray, y_data: np.ndarray, algorithm: str, ax: int):
+def umap_clean(
+    x_data: np.ndarray,
+    y_data: np.ndarray,
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
+    ax: int,
+):
     umap_file = os.path.join(
         create_directory(algorithm, "global", "data", "umap"), "umap_clean.pkl"
     )

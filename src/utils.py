@@ -1,8 +1,12 @@
 import os
+from typing_extensions import Literal
 
 
 # creates directiories for kmeans, agglomerative, dbscan and jp
-def create_algorithm_directory(algorithm: str, method: str) -> tuple:
+def create_algorithm_directory(
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
+    method: Literal["global", "local"],
+) -> tuple:
     centroids_folder = os.path.join(
         f"../stored_results/{algorithm}/{method}", "centroids"
     )
@@ -16,7 +20,10 @@ def create_algorithm_directory(algorithm: str, method: str) -> tuple:
 
 # creates directiories for distances, images and umap or tsne data
 def create_directory(
-    algorithm: str, method: str, type: str, umap_tsne: str = ""
+    algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
+    method: Literal["global", "local"],
+    type: Literal["distances", "data", "images"],
+    umap_tsne: Literal["umap", "tsne"] = "",
 ) -> str:
     folder = f"../stored_results/{algorithm}/{method}"
     if umap_tsne:
