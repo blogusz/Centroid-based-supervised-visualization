@@ -253,12 +253,10 @@ def viz_qa(
     # plt.tight_layout()
 
     # Showing the figure
-    # fig.savefig(
-    #     "/Users/bartoszminch/Documents/Repositories/viskit/python/results/{}.png".format(
-    #         tit
-    #     ),
-    #     dpi=fig.dpi,
-    # )
+    fig.savefig(
+        "../stored_results/{}.png".format(tit),
+        dpi=fig.dpi,
+    )
 
 
 class LocalMetric:

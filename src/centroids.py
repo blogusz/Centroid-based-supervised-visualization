@@ -4,10 +4,7 @@ from typing_extensions import Literal
 from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.cluster import DBSCAN
-
 from sklearn.manifold import TSNE
-
-# from tsnecuda import TSNE
 import matplotlib.transforms as transforms
 import warnings
 import os
@@ -18,8 +15,7 @@ from jarvis_patrick import JP
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-# algorithm is a clustering algorithm we want to use
-# method - global, local, hybrid
+# main function of the whole project. We choose what algorithm we want to use, in what form and how many centroids we want to find.
 def compute_centroids(
     algorithm: Literal["kmeans", "agglomerative", "dbscan", "jp"],
     method: Literal["global", "local"],
@@ -67,6 +63,7 @@ def global_kmeans(x_data: np.ndarray, n_centroids: int):
     return centroids, cluster_labels
 
 
+# it is a helper function to distinguish local and global k-means algorithm in order to avoid conflicts with read and write results
 def local_global_kmeans(x_data: np.ndarray, n_centroids: int, only_global: bool):
     if (
         only_global
@@ -101,6 +98,7 @@ def local_kmeans(x_data: np.ndarray, y_data: np.ndarray, n_centroids: int):
     centroids = []
     cluster_labels = []
 
+    # compute centroids within each cluster from the input dataset.
     for label in set(y_data):
         centroid_file = os.path.join(
             centroids_folder, f"kmeans_local_{label}_{n_centroids}_centroids.npy"
@@ -118,6 +116,7 @@ def local_kmeans(x_data: np.ndarray, y_data: np.ndarray, n_centroids: int):
             centroid = np.load(centroid_file)
             labels = np.load(labels_file)
         else:
+            # global_kmeans can be used for each cluster separately
             centroid, labels = local_global_kmeans(
                 x_data[y_data == label], n_centroids, False
             )
@@ -151,6 +150,7 @@ def global_agglomerative(x_data: np.ndarray, n_centroids: int):
     else:
         agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
         labels = agglomerative.fit_predict(x_data)
+        # calculate centroids as the centers of gravity of the cluster
         centroids = np.array(
             [np.mean(x_data[labels == i], axis=0) for i in range(n_centroids)]
         )
@@ -170,6 +170,7 @@ def local_agglomerative(x_data: np.ndarray, y_data: np.ndarray, n_centroids: int
     centroids = []
     cluster_labels = []
 
+    # compute centroids within each cluster from the input dataset
     for label in set(y_data):
         centroid_file = os.path.join(
             centroids_folder, f"agglomerative_local_{label}_{n_centroids}_centroids.npy"
@@ -190,6 +191,7 @@ def local_agglomerative(x_data: np.ndarray, y_data: np.ndarray, n_centroids: int
             x_labeled = x_data[y_data == label]
             agglomerative = AgglomerativeClustering(n_clusters=n_centroids)
             labels = agglomerative.fit_predict(x_labeled)
+            # calculate centroids as the centers of gravity of the cluster
             centroid = np.array(
                 [np.mean(x_labeled[labels == i], axis=0) for i in range(n_centroids)]
             )
@@ -208,8 +210,12 @@ def local_agglomerative(x_data: np.ndarray, y_data: np.ndarray, n_centroids: int
 
 def global_dbscan(x_data: np.ndarray, epsilon: float, min_samples: int):
     centroids_folder, labels_folder = create_algorithm_directory("dbscan", "global")
-    centroids_file = os.path.join(centroids_folder, "centroids.npy")
-    labels_file = os.path.join(labels_folder, "labels.npy")
+    centroids_file = os.path.join(
+        centroids_folder, f"dbscan_global_{epsilon}_{min_samples}_centroids.npy"
+    )
+    labels_file = os.path.join(
+        labels_folder, f"dbscan_global_{epsilon}_{min_samples}_labels.npy"
+    )
 
     if (
         os.path.exists(centroids_file)
@@ -222,6 +228,8 @@ def global_dbscan(x_data: np.ndarray, epsilon: float, min_samples: int):
     else:
         dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
         labels = dbscan.fit_predict(x_data)
+
+        # calculate centroids as the centers of gravity of the cluster. Label '-1' means noise.
         unique_labels = [label for label in np.unique(labels) if label != -1]
         centroids = [
             np.mean(x_data[labels == label], axis=0) for label in unique_labels
@@ -237,8 +245,12 @@ def local_dbscan(
 ):
     centroids_folder, labels_folder = create_algorithm_directory("dbscan", "local")
 
-    centroids_file = os.path.join(centroids_folder, "centroids.npy")
-    labels_file = os.path.join(labels_folder, "labels.npy")
+    centroids_file = os.path.join(
+        centroids_folder, f"dbscan_local_{epsilon}_{min_samples}_centroids.npy"
+    )
+    labels_file = os.path.join(
+        labels_folder, f"dbscan_local_{epsilon}_{min_samples}_labels.npy"
+    )
 
     if (
         os.path.exists(centroids_file)
@@ -252,10 +264,12 @@ def local_dbscan(
         centroids = []
         cluster_labels = []
 
+        # compute centroids within each cluster from the input dataset
         for idx, label in enumerate(set(y_data)):
             x_labeled = x_data[y_data == label]
             dbscan = DBSCAN(eps=epsilon, min_samples=min_samples)
             labels_local = dbscan.fit_predict(x_labeled)
+            # calculate centroids as the centers of gravity of the cluster. Label '-1' means noise.
             unique_labels = [label for label in np.unique(labels_local) if label != -1]
             centroids.extend(
                 [
@@ -279,6 +293,7 @@ def global_jarvis_patrick(x_data: np.ndarray, k: int, kmin: int):
     clusters = jp.fit(x_data)
     cluster_labels = [None] * len(x_data)
     centroids = []
+
     for row_index, row in enumerate(clusters):
         c = np.mean(x_data[row], axis=0)
         centroids.append(list(c))
@@ -287,6 +302,7 @@ def global_jarvis_patrick(x_data: np.ndarray, k: int, kmin: int):
     return centroids, cluster_labels
 
 
+# it is a helper function to distinguish local and global jarvis-patrick algorithm in order to avoid conflicts with read and write results
 def local_global_jp(x_data: np.ndarray, k: int, kmin: int, only_global: bool):
     if only_global:
         centroids_folder, labels_folder = create_algorithm_directory("jp", "global")
@@ -312,7 +328,6 @@ def local_global_jp(x_data: np.ndarray, k: int, kmin: int, only_global: bool):
     return centroids, labels
 
 
-# n_centroids here is a number of centroids we want to find in each class
 def local_jarvis_patrick(x_data: np.ndarray, y_data: np.ndarray, k: int, kmin: int):
     centroids_folder, labels_folder = create_algorithm_directory("jp", "local")
 
@@ -336,6 +351,7 @@ def local_jarvis_patrick(x_data: np.ndarray, y_data: np.ndarray, k: int, kmin: i
             centroid = np.load(centroid_file)
             labels = np.load(labels_file, allow_pickle=True)
         else:
+            # global_jarvis_patrick can be used for each cluster separately
             centroid, labels = local_global_jp(x_data[y_data == label], k, kmin, False)
             np.save(centroid_file, centroid)
             np.save(labels_file, labels)
@@ -350,6 +366,7 @@ def local_jarvis_patrick(x_data: np.ndarray, y_data: np.ndarray, k: int, kmin: i
     return centroids, cluster_labels
 
 
+# function used for calculating distances beetwen data points and computed centroids
 def measure_distances(
     x_data: np.ndarray,
     centroids: np.ndarray,
@@ -358,6 +375,7 @@ def measure_distances(
     metric: Literal["euclidean", "manhattan", "chebyshev"] = "euclidean",
 ):
     n_centroids = len(centroids)
+    # for local centroids, the number of centroids per cluster is equal to one tenth of the total number of centroids
     if algorithm not in ["dbscan", "jp"] and method == "local":
         n_centroids = int(n_centroids / 10)
 
@@ -386,6 +404,7 @@ def measure_distances(
     return distances
 
 
+# tsne used for data processed by one of our algorithms
 def tsne_algorithms(
     x_data: np.ndarray,
     y_data: np.ndarray,
@@ -394,6 +413,7 @@ def tsne_algorithms(
     ax: int,
 ):
     n_centroids = x_data.shape[1]
+    # for local centroids, the number of centroids per cluster is equal to one tenth of the total number of centroids
     if algorithm not in ["dbscan", "jp"] and method == "local":
         n_centroids = int(n_centroids / 10)
 
@@ -410,7 +430,6 @@ def tsne_algorithms(
         embedded_data = pickle.load(open(tsne_file, "rb"))
     else:
         tsne = TSNE(n_components=2, random_state=42)
-        # tsne = TSNE(n_components=2)
         embedded_data = tsne.fit_transform(x_data)
 
         pickle.dump(embedded_data, open(tsne_file, "wb"))
@@ -433,6 +452,8 @@ def tsne_algorithms(
 
     if method == "global":
         ax.set_title(f"{algorithm} with {n_centroids} global centroids")
+    elif algorithm == "dbscan":
+        ax.set_title(f"{algorithm} with {n_centroids} local centroids")
     else:
         ax.set_title(f"{algorithm} with {n_centroids} local centroids per cluster")
 
@@ -444,6 +465,7 @@ def tsne_algorithms(
     ax.figure.savefig(tsne_image_file, bbox_inches=bbox)
 
 
+# tsne used for unaltered data
 def tsne_clean(
     x_data: np.ndarray,
     y_data: np.ndarray,
@@ -461,7 +483,6 @@ def tsne_clean(
         embedded_data = pickle.load(open(tsne_file, "rb"))
     else:
         tsne = TSNE(n_components=2, random_state=42)
-        # tsne = TSNE(n_components=2)
         embedded_data = tsne.fit_transform(x_data)
         pickle.dump(embedded_data, open(tsne_file, "wb"))
 
@@ -507,6 +528,7 @@ def umap_algorithms(
     ax: int,
 ):
     n_centroids = x_data.shape[1]
+    # for local centroids, the number of centroids per cluster is equal to one tenth of the total number of centroids
     if algorithm not in ["dbscan", "jp"] and method == "local":
         n_centroids = int(n_centroids / 10)
 
@@ -545,6 +567,8 @@ def umap_algorithms(
 
     if method == "global":
         ax.set_title(f"{algorithm} with {n_centroids} global centroids")
+    elif algorithm == "dbscan":
+        ax.set_title(f"{algorithm} with {n_centroids} local centroids")
     else:
         ax.set_title(f"{algorithm} with {n_centroids} local centroids per cluster")
 
@@ -556,6 +580,7 @@ def umap_algorithms(
     ax.figure.savefig(umap_image_file, bbox_inches=bbox)
 
 
+# umap used for unaltered data
 def umap_clean(
     x_data: np.ndarray,
     y_data: np.ndarray,
