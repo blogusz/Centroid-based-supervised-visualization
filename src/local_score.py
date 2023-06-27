@@ -253,6 +253,7 @@ def viz_qa(
     # plt.tight_layout()
 
     # Showing the figure
+    # TODO titles should differ for each figure
     fig.savefig(
         "../stored_results/{}.png".format(tit),
         dpi=fig.dpi,
